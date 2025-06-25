@@ -1,4 +1,15 @@
-//version 1.3
+
+# -------------------------------------------
+# Project Manangement - Version 1.0
+# Author: Ermelino Piazzetta
+# Creation Date: 2025-06-25
+# Description: System for registering, calculating, and generating
+#              project spreadsheets with Excel export.
+# -------------------------------------------
+
+
+
+
 import openpyxl
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle

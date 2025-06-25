@@ -2,7 +2,7 @@
 # -*- main.py -*-
 # -------------------------------------------
 # Project Management    - Version 1.0
-# Author: [Your Name or Team]
+# Author: Ermelino Piazzetta
 # Creation Date: 2025-06-25
 # Description: Main entry point of the system.
 # -------------------------------------------
@@ -56,7 +56,7 @@ if __name__ == "__main__":
 # -*- input_utils.py -*-
 # -------------------------------------------
 # Project Management    - Version 1.0
-# Author: [Your Name or Team]
+# Author: Ermelino Piazzetta
 # Creation Date: 2025-06-25
 # Description: Input and validation utilities.
 # -------------------------------------------
@@ -103,7 +103,7 @@ def register_items() -> Tuple[List[Dict], Dict[str, float]]:
 # -*- file_utils.py -*-
 # -------------------------------------------
 # Project Management    - Version 1.0
-# Author: [Your Name or Team]
+# Author: Ermelino Piazzetta
 # Creation Date: 2025-06-25
 # Description: File handling utilities (open, list).
 # -------------------------------------------
@@ -127,7 +127,7 @@ def list_existing_projects() -> List[str]:
 # -*- spreadsheet.py -*-
 # -------------------------------------------
 # Project Management    - Version 1.0
-# Author: [Your Name or Team]
+# Author: Ermelino Piazzetta
 # Creation Date: 2025-06-25
 # Description: Handles spreadsheet creation, formatting, charts.
 # -------------------------------------------
@@ -215,7 +215,7 @@ def save_project_spreadsheet(project_name: str, items: List[Dict], totals: Dict[
 # -*- summary.py -*-
 # -------------------------------------------
 # Project Management    - Version 1.0
-# Author: [Your Name or Team]
+# Author: Ermelino Piazzetta
 # Creation Date: 2025-06-25
 # Description: Updates the Excel summary with total project values.
 # -------------------------------------------

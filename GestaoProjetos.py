@@ -88,44 +88,44 @@ if __name__ == "__main__":
 # Description: Input and validation utilities.
 # -------------------------------------------
 
-from typing import Any, Tuple, List, Dict
-from collections import defaultdict
-
-def prompt_for_value(message: str, value_type: type) -> Any:
+def prompt_for_value(message: str, val_type: type):
     while True:
         user_input = input(message)
         try:
-            return value_type(user_input)
+            return val_type(user_input)
         except ValueError:
-            print(f"Invalid input. Expected a {value_type.__name__}.")
+            print(f"Invalid input. Please enter a value of type {val_type.__name__}.")
 
-def register_items() -> Tuple[List[Dict], Dict[str, float]]:
+def register_items():
     print("\n=== Item Registration ===")
-    print("Type 'end' as description to finish.\n")
+    print("Enter 'end' in the description to finish.\n")
 
     items = []
-    totals = defaultdict(float)
+    totals_by_category = {}
 
     while True:
-        desc = input("Item description (or 'end'): ").strip()
-        if desc.lower() == 'end':
+        description = input("Item description (or 'end' to finish): ").strip()
+        if description.lower() == 'end':
             break
+
         quantity = prompt_for_value("Quantity: ", float)
-        unit = input("Unit (e.g., hour, material): ").strip()
+        unit = input("Unit (e.g. man-hour, material): ").strip()
         unit_price = prompt_for_value("Unit price (R$): ", float)
         total_price = quantity * unit_price
 
         items.append({
-            "Description": desc,
+            "Description": description,
             "Quantity": quantity,
             "Unit": unit,
             "Unit Price": unit_price,
-            "Total": total_price
+            "Total Price": total_price
         })
-        totals[desc] += total_price
-        print("Item added!\n")
 
-    return items, totals
+        totals_by_category[description] = totals_by_category.get(description, 0) + total_price
+
+        print("Item successfully added!\n")
+
+    return items, totals_by_category
 
 # -*- file_utils.py -*-
 # -------------------------------------------

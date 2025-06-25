@@ -1,48 +1,153 @@
 
+# -*- main.py -*-
 # -------------------------------------------
-# Project Manangement - Version 1.0
-# Author: Ermelino Piazzetta
+# Project Management    - Version 1.0
+# Author: [Your Name or Team]
 # Creation Date: 2025-06-25
-# Description: System for registering, calculating, and generating
-#              project spreadsheets with Excel export.
+# Description: Main entry point of the system.
 # -------------------------------------------
 
+from input_utils import prompt_for_value, register_items
+from file_utils import open_file, list_existing_projects
+from spreadsheet import save_project_spreadsheet
+from summary import update_project_summary
 
+def main() -> None:
+    print("=== Project Management    ===")
 
+    while True:
+        choice = input("\nStart a (N)ew project or open an (E)xisting one? (n/e): ").strip().lower()
+        if choice == 'n':
+            project_name = input("Enter the new project name: ").strip().replace(" ", "_")
+            break
+        elif choice == 'e':
+            projects = list_existing_projects()
+            if not projects:
+                print("No existing projects found.")
+                return
+            print("Existing projects:")
+            for i, project in enumerate(projects, start=1):
+                print(f"{i}. {project}")
+            index = prompt_for_value("Select a project number: ", int)
+            if 1 <= index <= len(projects):
+                project_name = projects[index - 1]
+                break
+            else:
+                print("Invalid choice.")
+        else:
+            print("Invalid option. Enter 'n' or 'e'.")
 
-import openpyxl
-from openpyxl import Workbook, load_workbook
-from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
-from openpyxl.chart import BarChart, Reference
-import os
-import platform
+    while True:
+        items, totals = register_items()
+        if items:
+            total = save_project_spreadsheet(project_name, items, totals)
+            update_project_summary(project_name, total)
+        else:
+            print("No items registered.")
+
+        cont = input("\nRegister more items for this project? (y/n): ").strip().lower()
+        if cont != 'y':
+            print("Ending project registration.")
+            break
+
+if __name__ == "__main__":
+    main()
+
+# -*- input_utils.py -*-
+# -------------------------------------------
+# Project Management    - Version 1.0
+# Author: [Your Name or Team]
+# Creation Date: 2025-06-25
+# Description: Input and validation utilities.
+# -------------------------------------------
+
+from typing import Any, Tuple, List, Dict
 from collections import defaultdict
 
-def solicitar_dado(mensagem: str, tipo: type):
+def prompt_for_value(message: str, value_type: type) -> Any:
     while True:
-        entrada = input(mensagem)
+        user_input = input(message)
         try:
-            return tipo(entrada)
+            return value_type(user_input)
         except ValueError:
-            print(f"Entrada inválida. Por favor, insira um valor do tipo {tipo.__name__}.")
+            print(f"Invalid input. Expected a {value_type.__name__}.")
 
-def abrir_planilha(nome_arquivo: str):
-    if platform.system() == "Windows":
-        os.startfile(nome_arquivo)
-    elif platform.system() == "Darwin":
-        os.system(f"open {nome_arquivo}")
+def register_items() -> Tuple[List[Dict], Dict[str, float]]:
+    print("\n=== Item Registration ===")
+    print("Type 'end' as description to finish.\n")
+
+    items = []
+    totals = defaultdict(float)
+
+    while True:
+        desc = input("Item description (or 'end'): ").strip()
+        if desc.lower() == 'end':
+            break
+        quantity = prompt_for_value("Quantity: ", float)
+        unit = input("Unit (e.g., hour, material): ").strip()
+        unit_price = prompt_for_value("Unit price (R$): ", float)
+        total_price = quantity * unit_price
+
+        items.append({
+            "Description": desc,
+            "Quantity": quantity,
+            "Unit": unit,
+            "Unit Price": unit_price,
+            "Total": total_price
+        })
+        totals[desc] += total_price
+        print("Item added!\n")
+
+    return items, totals
+
+# -*- file_utils.py -*-
+# -------------------------------------------
+# Project Management    - Version 1.0
+# Author: [Your Name or Team]
+# Creation Date: 2025-06-25
+# Description: File handling utilities (open, list).
+# -------------------------------------------
+
+import os
+import platform
+from typing import List
+
+def open_file(file_name: str) -> None:
+    system = platform.system()
+    if system == "Windows":
+        os.startfile(file_name)
+    elif system == "Darwin":
+        os.system(f"open '{file_name}'")
     else:
-        os.system(f"xdg-open {nome_arquivo}")
+        os.system(f"xdg-open '{file_name}'")
 
-def aplicar_formatacao(ws):
-    bold_font = Font(bold=True)
-    fill_header = PatternFill("solid", fgColor="BDD7EE")
-    border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
-    money_style = NamedStyle(name="money_style", number_format='"R$"#,##0.00')
-    if "money_style" not in ws.parent.named_styles:
+def list_existing_projects() -> List[str]:
+    return [f[8:-5] for f in os.listdir() if f.startswith("projeto_") and f.endswith(".xlsx")]
+
+# -*- spreadsheet.py -*-
+# -------------------------------------------
+# Project Management    - Version 1.0
+# Author: [Your Name or Team]
+# Creation Date: 2025-06-25
+# Description: Handles spreadsheet creation, formatting, charts.
+# -------------------------------------------
+
+import os
+from typing import List, Dict
+from openpyxl import Workbook, load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
+from openpyxl.chart import BarChart, Reference
+
+from file_utils import open_file
+
+def apply_formatting(ws: Worksheet) -> None:
+    bold = Font(bold=True)
+    fill = PatternFill("solid", fgColor="BDD7EE")
+    border = Border(*(Side(style="thin") for _ in range(4)))
+
+    money_style = NamedStyle(name="money", number_format='"R$"#,##0.00')
+    if "money" not in ws.parent.named_styles:
         ws.parent.add_named_style(money_style)
 
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=5):
@@ -50,152 +155,86 @@ def aplicar_formatacao(ws):
             cell.border = border
             cell.alignment = Alignment(horizontal="center", vertical="center")
             if cell.row == 1:
-                cell.font = bold_font
-                cell.fill = fill_header
+                cell.font = bold
+                cell.fill = fill
             elif cell.column in (4, 5):
                 cell.style = money_style
 
-def adicionar_grafico(ws, linha_inicio: int):
+def add_chart(ws: Worksheet, start_row: int) -> None:
     chart = BarChart()
-    chart.title = "Totais por Categoria"
-    chart.x_axis.title = "Categoria"
-    chart.y_axis.title = "Valor Total (R$)"
+    chart.title = "Total per Category"
+    chart.x_axis.title = "Category"
+    chart.y_axis.title = "Total Value (R$)"
 
-    dados = Reference(ws, min_col=2, min_row=linha_inicio + 1, max_row=ws.max_row)
-    categorias = Reference(ws, min_col=1, min_row=linha_inicio + 2, max_row=ws.max_row)
+    data = Reference(ws, min_col=2, min_row=start_row + 1, max_row=ws.max_row)
+    categories = Reference(ws, min_col=1, min_row=start_row + 2, max_row=ws.max_row)
 
-    chart.add_data(dados, titles_from_data=True)
-    chart.set_categories(categorias)
+    chart.add_data(data, titles_from_data=True)
+    chart.set_categories(categories)
 
     ws.add_chart(chart, f"A{ws.max_row + 3}")
 
-def escrever_itens_na_planilha(ws, itens, totais_por_categoria):
-    for item in itens:
+def write_items(ws: Worksheet, items: List[Dict], totals: Dict[str, float]) -> None:
+    for item in items:
         ws.append([
-            item["Descrição"],
-            item["Quantidade"],
-            item["Unidade"],
-            item["Valor Unitário"],
-            item["Valor Total"]
+            item["Description"],
+            item["Quantity"],
+            item["Unit"],
+            item["Unit Price"],
+            item["Total"]
         ])
     ws.append([])
-    linha_inicio_totais = ws.max_row + 1
-    ws.append(["Totais por Categoria"])
-    ws.append(["Categoria", "Total (R$)"])
-    for categoria, total in totais_por_categoria.items():
-        ws.append([categoria, total])
+    start_row = ws.max_row + 1
+    ws.append(["Total per Category"])
+    ws.append(["Category", "Total (R$)"])
+    for category, total in totals.items():
+        ws.append([category, total])
 
-    aplicar_formatacao(ws)
-    adicionar_grafico(ws, linha_inicio_totais)
+    apply_formatting(ws)
+    add_chart(ws, start_row)
 
-def cadastrar_itens():
-    print("\n=== Cadastro de Itens ===")
-    print("Digite 'fim' na descrição para encerrar a entrada de dados.\n")
+def save_project_spreadsheet(project_name: str, items: List[Dict], totals: Dict[str, float]) -> float:
+    file_name = f"projeto_{project_name}.xlsx"
 
-    itens = []
-    totais_por_categoria = defaultdict(float)
-
-    while True:
-        descricao = input("Descrição do item (ou 'fim' para encerrar): ").strip()
-        if descricao.lower() == 'fim':
-            break
-
-        quantidade = solicitar_dado("Quantidade: ", float)
-        unidade = input("Unidade (ex: homem hora, material): ").strip()
-        valor_unitario = solicitar_dado("Valor unitário (R$): ", float)
-        valor_total = quantidade * valor_unitario
-
-        itens.append({
-            "Descrição": descricao,
-            "Quantidade": quantidade,
-            "Unidade": unidade,
-            "Valor Unitário": valor_unitario,
-            "Valor Total": valor_total
-        })
-
-        totais_por_categoria[descricao] += valor_total
-        print("Item adicionado com sucesso!\n")
-
-    return itens, totais_por_categoria
-
-def salvar_em_planilha_projeto(nome_projeto: str, itens, totais_por_categoria):
-    nome_arquivo = f"projeto_{nome_projeto}.xlsx"
-    if os.path.exists(nome_arquivo):
-        wb = load_workbook(nome_arquivo)
+    if os.path.exists(file_name):
+        wb = load_workbook(file_name)
         ws = wb.active
     else:
         wb = Workbook()
         ws = wb.active
-        ws.title = "Itens do Projeto"
-        ws.append(["Descrição", "Quantidade", "Unidade", "Valor Unitário (R$)", "Valor Total (R$)"])
+        ws.title = "Project Items"
+        ws.append(["Description", "Quantity", "Unit", "Unit Price (R$)", "Total (R$)"])
 
-    escrever_itens_na_planilha(ws, itens, totais_por_categoria)
-    wb.save(nome_arquivo)
-    print(f"\nArquivo '{nome_arquivo}' salvo com sucesso.")
-    abrir_planilha(nome_arquivo)
+    write_items(ws, items, totals)
+    wb.save(file_name)
+    print(f"\nFile '{file_name}' saved successfully.")
+    open_file(file_name)
 
-    return sum(totais_por_categoria.values())
+    return sum(totals.values())
 
-def atualizar_resumo_projetos(nome_projeto: str, total_projeto: float):
-    nome_resumo = "resumo_projetos.xlsx"
+# -*- summary.py -*-
+# -------------------------------------------
+# Project Management    - Version 1.0
+# Author: [Your Name or Team]
+# Creation Date: 2025-06-25
+# Description: Updates the Excel summary with total project values.
+# -------------------------------------------
 
-    if os.path.exists(nome_resumo):
-        wb = load_workbook(nome_resumo)
+import os
+from openpyxl import Workbook, load_workbook
+
+def update_project_summary(project_name: str, total: float) -> None:
+    summary_file = "resumo_projetos.xlsx"
+
+    if os.path.exists(summary_file):
+        wb = load_workbook(summary_file)
         ws = wb.active
     else:
         wb = Workbook()
         ws = wb.active
-        ws.title = "Resumo de Projetos"
-        ws.append(["Projeto", "Gasto Total (R$)"])
+        ws.title = "Project Summary"
+        ws.append(["Project", "Total Cost (R$)"])
 
-    # Remover linha antiga se já existe
     for row in ws.iter_rows(min_row=2, values_only=False):
-        if row[0].value == nome_projeto:
-            ws.delete_rows(row[0].row)
-
-    ws.append([nome_projeto, total_projeto])
-    wb.save(nome_resumo)
-    print(f"Resumo atualizado em '{nome_resumo}'.")
-
-def listar_projetos_existentes():
-    return [f[8:-5] for f in os.listdir() if f.startswith("projeto_") and f.endswith(".xlsx")]
-
-def main():
-    print("=== Sistema de Cadastro de Projetos ===")
-    while True:
-        tipo = input("\nVocê deseja iniciar um (N)ovo projeto ou abrir um (E)xistente? (n/e): ").strip().lower()
-        if tipo == 'n':
-            nome_projeto = input("Digite o nome do novo projeto: ").strip().replace(" ", "_")
-            break
-        elif tipo == 'e':
-            projetos = listar_projetos_existentes()
-            if not projetos:
-                print("Nenhum projeto encontrado.")
-                return
-            print("Projetos existentes:")
-            for i, p in enumerate(projetos, start=1):
-                print(f"{i}. {p}")
-            escolha = solicitar_dado("Escolha o número do projeto: ", int)
-            if 1 <= escolha <= len(projetos):
-                nome_projeto = projetos[escolha - 1]
-                break
-            else:
-                print("Escolha inválida.")
-        else:
-            print("Opção inválida. Digite 'n' ou 'e'.")
-
-    while True:
-        itens, totais = cadastrar_itens()
-        if itens:
-            total_do_projeto = salvar_em_planilha_projeto(nome_projeto, itens, totais)
-            atualizar_resumo_projetos(nome_projeto, total_do_projeto)
-        else:
-            print("Nenhum item foi cadastrado.")
-
-        continuar = input("\nDeseja cadastrar mais itens neste projeto? (s/n): ").strip().lower()
-        if continuar != 's':
-            print("Encerrando o cadastro para este projeto.")
-            break
-
-if __name__ == "__main__":
-    main()
+        if row[0].value == project_name:
+            ws.delete_rows(row[0].row

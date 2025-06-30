@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management - Version 1.0
-# Author: Ermelino Piazzetta
+# Project Management - Version 1.1
+# Author: Ermelino Piazzetta (modificado)
 # Creation Date: 2025-06-25
-# Description: All-in-one project management system script.
+# Description: All-in-one project management system script with confirmation on inputs.
 # -------------------------------------------
 
 import os
@@ -15,6 +15,21 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedSty
 from openpyxl.chart import BarChart, Reference
 
 # === Input Utilities ===
+
+def get_validated_input(prompt: str, convert_func=str):
+    while True:
+        value = input(prompt).strip()
+        if convert_func == str:
+            value = value.capitalize()
+        try:
+            value = convert_func(value)
+        except ValueError:
+            print(f"Entrada inválida. Esperado tipo {convert_func.__name__}.")
+            continue
+        print(f"Você digitou: {value}")
+        confirm = input("Confirma esta informação? (s/n): ").strip().lower()
+        if confirm == 's':
+            return value
 
 def prompt_for_value(message: str, val_type: type):
     while True:
@@ -32,12 +47,12 @@ def register_items():
     totals_by_category = defaultdict(float)
 
     while True:
-        description = input("Item description (or 'end' to finish): ").strip()
-        if description.lower() == 'end':
+        description = get_validated_input("Item description (or 'end' to finish): ")
+        if description.lower() == 'End':
             break
-        quantity = prompt_for_value("Quantity: ", float)
-        unit = input("Unit (e.g. man-hour, material): ").strip()
-        unit_price = prompt_for_value("Unit price (R$): ", float)
+        quantity = get_validated_input("Quantity: ", float)
+        unit = get_validated_input("Unit (e.g. man-hour, material): ")
+        unit_price = get_validated_input("Unit price (R$): ", float)
         total_price = quantity * unit_price
 
         items.append({
@@ -176,7 +191,6 @@ def update_project_summary(project_name: str, project_total: float):
         ws.title = "Project Summary"
         ws.append(["Project", "Total Cost (R$)"])
 
-    # Remove existing row for the project if it exists
     for row in ws.iter_rows(min_row=2, values_only=False):
         if row[0].value == project_name:
             ws.delete_rows(row[0].row)
@@ -191,12 +205,11 @@ def main():
     while True:
         choice = input("\nDo you want to start a (N)ew project or open an (E)xisting one? (n/e): ").strip().lower()
         if choice == 'n':
-            project_name = input("Enter the new project name: ").strip().replace(" ", "_")
-            # Gather project info
-            manager = input("Project Manager Name: ").strip()
-            opening_date = input("Opening Date (YYYY-MM-DD): ").strip()
-            estimated_completion = input("Estimated Completion Date (YYYY-MM-DD): ").strip()
-            estimated_cost = prompt_for_value("Estimated Cost (R$): ", float)
+            project_name = get_validated_input("Enter the new project name: ").replace(" ", "_")
+            manager = get_validated_input("Project Manager Name: ")
+            opening_date = get_validated_input("Opening Date (YYYY-MM-DD): ")
+            estimated_completion = get_validated_input("Estimated Completion Date (YYYY-MM-DD): ")
+            estimated_cost = get_validated_input("Estimated Cost (R$): ", float)
 
             participants = []
             print("\nEnter project participants (leave name empty to finish):")
@@ -204,8 +217,9 @@ def main():
                 name = input("Participant Name: ").strip()
                 if not name:
                     break
-                email = input("Participant Email: ").strip()
-                phone = input("Participant Phone: ").strip()
+                name = name.capitalize()
+                email = get_validated_input("Participant Email: ")
+                phone = get_validated_input("Participant Phone: ")
                 participants.append({"Name": name, "Email": email, "Phone": phone})
 
             project_info = {
@@ -226,7 +240,7 @@ def main():
             print("Existing projects:")
             for i, p in enumerate(projects, 1):
                 print(f"{i}. {p}")
-            selection = prompt_for_value("Select the project number: ", int)
+            selection = get_validated_input("Select the project number: ", int)
             if 1 <= selection <= len(projects):
                 project_name = projects[selection - 1]
                 break

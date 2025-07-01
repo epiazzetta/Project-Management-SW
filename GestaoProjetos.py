@@ -2,10 +2,10 @@
 
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management - Version 1.1
-# Author: Ermelino Piazzetta (modificado)
+# Project Management - Version 1.3
+# Author: Ermelino Piazzetta (modificado e melhorado)
 # Creation Date: 2025-06-25
-# Description: All-in-one project management system script with confirmation on inputs.
+# Description: Sistema de gerenciamento de projetos com envio de e-mails para participantes.
 # -------------------------------------------
 
 import os
@@ -15,14 +15,18 @@ from collections import defaultdict
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
 from openpyxl.chart import BarChart, Reference
+import smtplib
+from email.message import EmailMessage
 
 # === Input Utilities ===
 
-def get_validated_input(prompt: str, convert_func=str):
+def get_validated_input(prompt: str, convert_func=str, capitalize=False):
     while True:
         value = input(prompt).strip()
-        if convert_func == str:
-            value = value.capitalize()
+        if value.lower() == "end":  # Verifica comando para encerrar antes da conversão
+            return "end"
+        if convert_func == str and capitalize:
+            value = value.title()
         try:
             value = convert_func(value)
         except ValueError:
@@ -33,14 +37,6 @@ def get_validated_input(prompt: str, convert_func=str):
         if confirm == 's':
             return value
 
-def prompt_for_value(message: str, val_type: type):
-    while True:
-        user_input = input(message)
-        try:
-            return val_type(user_input)
-        except ValueError:
-            print(f"Invalid input. Please enter a value of type {val_type.__name__}.")
-
 def register_items():
     print("\n=== Item Registration ===")
     print("Enter 'end' in the description to finish.\n")
@@ -49,8 +45,8 @@ def register_items():
     totals_by_category = defaultdict(float)
 
     while True:
-        description = get_validated_input("Item description (or 'end' to finish): ")
-        if description.lower() == 'End':
+        description = get_validated_input("Item description (or 'end' to finish): ", str, capitalize=True)
+        if isinstance(description, str) and description.lower() == 'end':
             break
         quantity = get_validated_input("Quantity: ", float)
         unit = get_validated_input("Unit (e.g. man-hour, material): ")
@@ -193,6 +189,7 @@ def update_project_summary(project_name: str, project_total: float):
         ws.title = "Project Summary"
         ws.append(["Project", "Total Cost (R$)"])
 
+    # Remove linha antiga, se existir
     for row in ws.iter_rows(min_row=2, values_only=False):
         if row[0].value == project_name:
             ws.delete_rows(row[0].row)
@@ -201,16 +198,50 @@ def update_project_summary(project_name: str, project_total: float):
     wb.save(summary_filename)
     print(f"Summary updated in '{summary_filename}'.")
 
+# === Email Sending ===
+
+def send_project_email(project_name, info):
+    for participant in info.get("Participants", []):
+        msg = EmailMessage()
+        msg["Subject"] = f"Abertura do projeto: {project_name}"
+        msg["From"] = "seuemail@gmail.com"  # Altere para seu e-mail
+        msg["To"] = participant["Email"]
+
+        msg.set_content(
+            f"""
+Olá {participant['Name']},
+
+Você foi registrado como participante do projeto "{project_name}".
+
+Gerente do Projeto: {info['Manager']}
+Data de Abertura: {info['Opening Date']}
+Conclusão Estimada: {info['Estimated Completion']}
+Custo Estimado: R$ {info['Estimated Cost']:.2f}
+
+Obrigado.
+            """.strip()
+        )
+
+        try:
+            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+                smtp.login("seuemail@gmail.com", "SUA_SENHA_DE_APP")  # Altere para sua senha de app
+                smtp.send_message(msg)
+            print(f"E-mail enviado para {participant['Email']}")
+        except Exception as e:
+            print(f"Erro ao enviar email para {participant['Email']}: {e}")
+
+# === Main Program ===
+
 def main():
     print("=== Project Registration System ===")
 
     while True:
         choice = input("\nDo you want to start a (N)ew project or open an (E)xisting one? (n/e): ").strip().lower()
         if choice == 'n':
-            project_name = get_validated_input("Enter the new project name: ").replace(" ", "_")
-            manager = get_validated_input("Project Manager Name: ")
-            opening_date = get_validated_input("Opening Date (YYYY-MM-DD): ")
-            estimated_completion = get_validated_input("Estimated Completion Date (YYYY-MM-DD): ")
+            project_name = get_validated_input("Enter the new project name: ", str, capitalize=True).replace(" ", "_")
+            manager = get_validated_input("Project Manager Name: ", str, capitalize=True)
+            opening_date = get_validated_input("Opening Date (YYYY-MM-DD): ", str)
+            estimated_completion = get_validated_input("Estimated Completion Date (YYYY-MM-DD): ", str)
             estimated_cost = get_validated_input("Estimated Cost (R$): ", float)
 
             participants = []
@@ -219,9 +250,9 @@ def main():
                 name = input("Participant Name: ").strip()
                 if not name:
                     break
-                name = name.capitalize()
-                email = get_validated_input("Participant Email: ")
-                phone = get_validated_input("Participant Phone: ")
+                name = name.title()
+                email = input("Participant Email: ").strip().lower()
+                phone = input("Participant Phone: ").strip()
                 participants.append({"Name": name, "Email": email, "Phone": phone})
 
             project_info = {
@@ -232,6 +263,9 @@ def main():
                 "Participants": participants
             }
             save_project_info_sheet(project_name, project_info)
+
+            # Envia e-mails para os participantes
+            send_project_email(project_name, project_info)
             break
 
         elif choice == 'e':

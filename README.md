@@ -5,3 +5,10 @@ meu_diretorio/
 ├── projeto_Obra_Sede.xlsx
 ├── projeto_DataCenter.xlsx
 └── resumo_projetos.xlsx
+Set up your email and app password in the send_project_email section before using the sending feature.
+
+To use Gmail, set up an app password to avoid blocks.
+
+The function get_validated_input now accepts a parameter called capitalize to control when to apply .title() on the input.
+
+The "end" command correctly finishes the item registration, without being confused by capitalization.

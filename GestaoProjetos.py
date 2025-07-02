@@ -2,7 +2,7 @@
 
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management - Versão Segura 1.4
+# Project Management - Versão 1.5
 # Autor: Ermelino Piazzetta (modificado por segurança)
 # -------------------------------------------
 
@@ -283,6 +283,12 @@ def main():
             print("Opção inválida. Use 'n' ou 'e'.")
 
     while True:
+        print("\nDeseja adicionar novos itens ao projeto?")
+        cont = input("Digite 's' para sim ou qualquer outra tecla para encerrar: ").strip().lower()
+        if cont != 's':
+            print("Encerrando o projeto.")
+            break
+
         items, totals = register_items()
         if items:
             total_cost = save_project_spreadsheet(project_name, items, totals)
@@ -290,10 +296,6 @@ def main():
         else:
             print("Nenhum item registrado.")
 
-        cont = input("\nDeseja adicionar mais itens? (s/n): ").strip().lower()
-        if cont != 's':
-            print("Encerrando o projeto.")
-            break
 
 
 if __name__ == "__main__":

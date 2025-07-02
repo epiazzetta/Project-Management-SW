@@ -12,3 +12,12 @@ To use Gmail, set up an app password to avoid blocks.
 The function get_validated_input now accepts a parameter called capitalize to control when to apply .title() on the input.
 
 The "end" command correctly finishes the item registration, without being confused by capitalization.
+
+Requirements to run:
+
+Create a .env file with:
+EMAIL_PASSWORD=your_app_password
+
+
+Install:
+pip install python-dotenv openpyxl

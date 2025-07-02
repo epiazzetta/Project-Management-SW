@@ -1,9 +1,9 @@
-
-
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management - Versão Segura 1.4
-# Autor: Ermelino Piazzetta (modificado por segurança)
+# Project Management - Version 1.3
+# Author: Ermelino Piazzetta (modificado e melhorado)
+# Creation Date: 2025-06-25
+# Description: Sistema de gerenciamento de projetos com envio de e-mails para participantes.
 # -------------------------------------------
 
 import os
@@ -15,16 +15,13 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedSty
 from openpyxl.chart import BarChart, Reference
 import smtplib
 from email.message import EmailMessage
-from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
-load_dotenv()
-
+# === Input Utilities ===
 
 def get_validated_input(prompt: str, convert_func=str, capitalize=False):
     while True:
         value = input(prompt).strip()
-        if value.lower() == "end":
+        if value.lower() == "end":  # Verifica comando para encerrar antes da conversão
             return "end"
         if convert_func == str and capitalize:
             value = value.title()
@@ -38,20 +35,20 @@ def get_validated_input(prompt: str, convert_func=str, capitalize=False):
         if confirm == 's':
             return value
 
-
 def register_items():
     print("\n=== Item Registration ===")
-    print("Digite 'end' para encerrar.\n")
+    print("Enter 'end' in the description to finish.\n")
+
     items = []
     totals_by_category = defaultdict(float)
 
     while True:
-        description = get_validated_input("Descrição: ", str, capitalize=True)
-        if description.lower() == 'end':
+        description = get_validated_input("Item description (or 'end' to finish): ", str, capitalize=True)
+        if isinstance(description, str) and description.lower() == 'end':
             break
-        quantity = get_validated_input("Quantidade: ", float)
-        unit = get_validated_input("Unidade (ex: hora, metro): ")
-        unit_price = get_validated_input("Preço unitário (R$): ", float)
+        quantity = get_validated_input("Quantity: ", float)
+        unit = get_validated_input("Unit (e.g. man-hour, material): ")
+        unit_price = get_validated_input("Unit price (R$): ", float)
         total_price = quantity * unit_price
 
         items.append({
@@ -63,23 +60,25 @@ def register_items():
         })
 
         totals_by_category[description] += total_price
-        print("Item adicionado!\n")
+        print("Item successfully added!\n")
 
     return items, totals_by_category
 
+# === File Utilities ===
 
 def open_file(filename: str):
-    if platform.system() == "Windows":
+    system = platform.system()
+    if system == "Windows":
         os.startfile(filename)
-    elif platform.system() == "Darwin":
+    elif system == "Darwin":
         os.system(f"open {filename}")
     else:
         os.system(f"xdg-open {filename}")
 
-
 def list_existing_projects():
     return [f[8:-5] for f in os.listdir() if f.startswith("projeto_") and f.endswith(".xlsx")]
 
+# === Spreadsheet Utilities ===
 
 def apply_formatting(ws):
     bold_font = Font(bold=True)
@@ -102,12 +101,11 @@ def apply_formatting(ws):
             elif cell.column in (4, 5):
                 cell.style = money_style
 
-
 def add_chart(ws, start_row: int):
     chart = BarChart()
-    chart.title = "Totais por Categoria"
-    chart.x_axis.title = "Categoria"
-    chart.y_axis.title = "Total (R$)"
+    chart.title = "Totals by Category"
+    chart.x_axis.title = "Category"
+    chart.y_axis.title = "Total Value (R$)"
 
     data = Reference(ws, min_col=2, min_row=start_row + 1, max_row=ws.max_row)
     categories = Reference(ws, min_col=1, min_row=start_row + 2, max_row=ws.max_row)
@@ -116,7 +114,6 @@ def add_chart(ws, start_row: int):
     chart.set_categories(categories)
 
     ws.add_chart(chart, f"A{ws.max_row + 3}")
-
 
 def write_items_to_sheet(ws, items, totals_by_category):
     for item in items:
@@ -129,14 +126,13 @@ def write_items_to_sheet(ws, items, totals_by_category):
         ])
     ws.append([])
     totals_start_row = ws.max_row + 1
-    ws.append(["Totais por Categoria"])
-    ws.append(["Categoria", "Total (R$)"])
+    ws.append(["Totals by Category"])
+    ws.append(["Category", "Total (R$)"])
     for category, total in totals_by_category.items():
         ws.append([category, total])
 
     apply_formatting(ws)
     add_chart(ws, totals_start_row)
-
 
 def save_project_spreadsheet(project_name: str, items, totals_by_category) -> float:
     filename = f"projeto_{project_name}.xlsx"
@@ -146,65 +142,69 @@ def save_project_spreadsheet(project_name: str, items, totals_by_category) -> fl
     else:
         wb = Workbook()
         ws = wb.active
-        ws.title = "Itens do Projeto"
-        ws.append(["Descrição", "Quantidade", "Unidade", "Preço Unitário (R$)", "Preço Total (R$)"])
+        ws.title = "Project Items"
+        ws.append(["Description", "Quantity", "Unit", "Unit Price (R$)", "Total Price (R$)"])
 
     write_items_to_sheet(ws, items, totals_by_category)
     wb.save(filename)
-    print(f"\nArquivo '{filename}' salvo com sucesso.")
+    print(f"\nFile '{filename}' saved successfully.")
     open_file(filename)
 
     return sum(totals_by_category.values())
 
-
-def save_project_info_sheet(project_name: str, info: dict):
+def save_project_info_sheet(project_name: str, info: dict) -> None:
     filename = f"projeto_{project_name}.xlsx"
-    wb = load_workbook(filename) if os.path.exists(filename) else Workbook()
+    if os.path.exists(filename):
+        wb = load_workbook(filename)
+    else:
+        wb = Workbook()
 
-    if "Informações" in wb.sheetnames:
-        wb.remove(wb["Informações"])
-    ws = wb.create_sheet(title="Informações")
-    ws.append(["Campo", "Valor"])
-    for key in ["Manager", "ManagerEmail", "Opening Date", "Estimated Completion", "Estimated Cost"]:
+    if "Project Info" in wb.sheetnames:
+        wb.remove(wb["Project Info"])
+
+    ws = wb.create_sheet(title="Project Info")
+    ws.append(["Field", "Value"])
+    for key in ["Manager", "Opening Date", "Estimated Completion", "Estimated Cost"]:
         ws.append([key, info[key]])
 
     ws.append([])
-    ws.append(["Nome Participante", "Email", "Telefone"])
-    for p in info.get("Participants", []):
-        ws.append([p["Name"], p["Email"], p["Phone"]])
+    ws.append(["Participant Name", "Email", "Phone Number"])
+    for participant in info.get("Participants", []):
+        ws.append([participant["Name"], participant["Email"], participant["Phone"]])
 
     wb.save(filename)
-    print(f"Informações do projeto salvas em '{filename}'.")
-
+    print(f"Project info sheet updated in '{filename}'.")
 
 def update_project_summary(project_name: str, project_total: float):
     summary_filename = "resumo_projetos.xlsx"
+
     if os.path.exists(summary_filename):
         wb = load_workbook(summary_filename)
         ws = wb.active
     else:
         wb = Workbook()
         ws = wb.active
-        ws.title = "Resumo"
-        ws.append(["Projeto", "Custo Total (R$)"])
+        ws.title = "Project Summary"
+        ws.append(["Project", "Total Cost (R$)"])
 
+    # Remove linha antiga, se existir
     for row in ws.iter_rows(min_row=2, values_only=False):
         if row[0].value == project_name:
             ws.delete_rows(row[0].row)
+
     ws.append([project_name, project_total])
     wb.save(summary_filename)
-    print(f"Resumo atualizado em '{summary_filename}'.")
+    print(f"Summary updated in '{summary_filename}'.")
 
+# === Email Sending ===
 
 def send_project_email(project_name, info):
-    from_email = info["ManagerEmail"]
-    app_password = os.getenv("EMAIL_PASSWORD")
-
     for participant in info.get("Participants", []):
         msg = EmailMessage()
         msg["Subject"] = f"Abertura do projeto: {project_name}"
-        msg["From"] = from_email
+        msg["From"] = "seuemail@gmail.com"  # Altere para seu e-mail
         msg["To"] = participant["Email"]
+
         msg.set_content(
             f"""
 Olá {participant['Name']},
@@ -217,70 +217,71 @@ Conclusão Estimada: {info['Estimated Completion']}
 Custo Estimado: R$ {info['Estimated Cost']:.2f}
 
 Obrigado.
-""".strip()
+            """.strip()
         )
 
         try:
             with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-                smtp.login(from_email, app_password)
+                smtp.login("seuemail@gmail.com", "SUA_SENHA_DE_APP")  # Altere para sua senha de app
                 smtp.send_message(msg)
             print(f"E-mail enviado para {participant['Email']}")
         except Exception as e:
-            print(f"Erro ao enviar e-mail para {participant['Email']}: {e}")
+            print(f"Erro ao enviar email para {participant['Email']}: {e}")
 
+# === Main Program ===
 
 def main():
-    print("=== Sistema de Registro de Projetos ===")
+    print("=== Project Registration System ===")
 
     while True:
-        choice = input("\nNovo projeto (n) ou existente (e)? ").strip().lower()
+        choice = input("\nDo you want to start a (N)ew project or open an (E)xisting one? (n/e): ").strip().lower()
         if choice == 'n':
-            project_name = get_validated_input("Nome do projeto: ", str, capitalize=True).replace(" ", "_")
-            manager = get_validated_input("Nome do gerente: ", str, capitalize=True)
-            manager_email = get_validated_input("Email do gerente (remetente): ", str)
-            opening_date = get_validated_input("Data de abertura (YYYY-MM-DD): ", str)
-            estimated_completion = get_validated_input("Data estimada de conclusão (YYYY-MM-DD): ", str)
-            estimated_cost = get_validated_input("Custo estimado (R$): ", float)
+            project_name = get_validated_input("Enter the new project name: ", str, capitalize=True).replace(" ", "_")
+            manager = get_validated_input("Project Manager Name: ", str, capitalize=True)
+            opening_date = get_validated_input("Opening Date (YYYY-MM-DD): ", str)
+            estimated_completion = get_validated_input("Estimated Completion Date (YYYY-MM-DD): ", str)
+            estimated_cost = get_validated_input("Estimated Cost (R$): ", float)
 
             participants = []
-            print("\nCadastro de participantes (deixe nome em branco para terminar):")
+            print("\nEnter project participants (leave name empty to finish):")
             while True:
-                name = input("Nome: ").strip()
+                name = input("Participant Name: ").strip()
                 if not name:
                     break
                 name = name.title()
-                email = input("Email: ").strip()
-                phone = input("Telefone: ").strip()
+                email = input("Participant Email: ").strip().lower()
+                phone = input("Participant Phone: ").strip()
                 participants.append({"Name": name, "Email": email, "Phone": phone})
 
             project_info = {
                 "Manager": manager,
-                "ManagerEmail": manager_email,
                 "Opening Date": opening_date,
                 "Estimated Completion": estimated_completion,
                 "Estimated Cost": estimated_cost,
                 "Participants": participants
             }
-
             save_project_info_sheet(project_name, project_info)
+
+            # Envia e-mails para os participantes
             send_project_email(project_name, project_info)
             break
 
         elif choice == 'e':
             projects = list_existing_projects()
             if not projects:
-                print("Nenhum projeto encontrado.")
+                print("No projects found.")
                 return
-            for i, name in enumerate(projects, 1):
-                print(f"{i}. {name}")
-            selection = get_validated_input("Escolha o número do projeto: ", int)
+            print("Existing projects:")
+            for i, p in enumerate(projects, 1):
+                print(f"{i}. {p}")
+            selection = get_validated_input("Select the project number: ", int)
             if 1 <= selection <= len(projects):
                 project_name = projects[selection - 1]
                 break
             else:
-                print("Opção inválida.")
+                print("Invalid choice.")
         else:
-            print("Opção inválida. Use 'n' ou 'e'.")
+            print("Invalid option. Please type 'n' or 'e'.")
 
     while True:
         items, totals = register_items()
@@ -288,13 +289,12 @@ def main():
             total_cost = save_project_spreadsheet(project_name, items, totals)
             update_project_summary(project_name, total_cost)
         else:
-            print("Nenhum item registrado.")
+            print("No items were registered.")
 
-        cont = input("\nDeseja adicionar mais itens? (s/n): ").strip().lower()
-        if cont != 's':
-            print("Encerrando o projeto.")
+        cont = input("\nDo you want to register more items in this project? (y/n): ").strip().lower()
+        if cont != 'y':
+            print("Ending registration for this project.")
             break
-
 
 if __name__ == "__main__":
     main()

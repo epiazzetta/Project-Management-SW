@@ -28,3 +28,8 @@ App GUI created with Tkinter, including Listbox and buttons for:
   Edit Project — adds items to an existing project
   Delete Project — removes the project's .xlsx file
   Exit — closes the application
+
+Menus at the top
+Tabs using ttk.Notebook
+Detailed view of items and participants in tables
+More organized forms for data entry

@@ -2,13 +2,15 @@
 
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management - Versão 1.7
-# Autor: Ermelino Piazzetta 
+# Project Management GUI - Version 1.0
+# Author: Ermelino Piazzetta (modified)
+# Using Tkinter for GUI
 # -------------------------------------------
 
 import os
 import platform
-from datetime import datetime
+import tkinter as tk
+from tkinter import simpledialog, messagebox, ttk, filedialog
 from collections import defaultdict
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side, NamedStyle
@@ -19,302 +21,183 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def get_validated_input(prompt: str, convert_func=str, capitalize=False):
-    while True:
-        value = input(prompt).strip()
-        if value.lower() == "end":
-            return "end"
-        if convert_func == str and capitalize:
-            value = value.title()
-        try:
-            value = convert_func(value)
-        except ValueError:
-            print(f"Entrada inválida. Esperado tipo {convert_func.__name__}.")
-            continue
-        print(f"Você digitou: {value}")
-        confirm = input("Confirma esta informação? (s/n): ").strip().lower()
-        if confirm == 's':
-            return value
-
-def register_items():
-    print("\n=== Registro de Itens ===")
-    print("Digite 'end' para encerrar.\n")
-    items = []
-    totals_by_category = defaultdict(float)
-
-    while True:
-        description = get_validated_input("Descrição: ", str, capitalize=True)
-        if description.lower() == 'end':
-            break
-        quantity = get_validated_input("Quantidade: ", float)
-        unit = get_validated_input("Unidade (ex: hora, metro): ")
-        unit_price = get_validated_input("Preço unitário (R$): ", float)
-        total_price = quantity * unit_price
-
-        items.append({
-            "Description": description,
-            "Quantity": quantity,
-            "Unit": unit,
-            "Unit Price": unit_price,
-            "Total Price": total_price
-        })
-
-        totals_by_category[description] += total_price
-        print("Item adicionado!\n")
-
-    return items, totals_by_category
-
-def open_file(filename: str):
-    if platform.system() == "Windows":
-        os.startfile(filename)
-    elif platform.system() == "Darwin":
-        os.system(f"open {filename}")
-    else:
-        os.system(f"xdg-open {filename}")
-
 def list_existing_projects():
-    return [f[8:-5] for f in os.listdir() if f.startswith("projeto_") and f.endswith(".xlsx")]
+    return [f[8:-5] for f in os.listdir() if f.startswith("project_") and f.endswith(".xlsx")]
 
-def apply_formatting(ws):
-    bold_font = Font(bold=True)
-    fill_header = PatternFill("solid", fgColor="BDD7EE")
-    border = Border(left=Side(style='thin'), right=Side(style='thin'),
-                    top=Side(style='thin'), bottom=Side(style='thin'))
-    money_style = NamedStyle(name="money_style", number_format='"R$"#,##0.00')
-    if "money_style" not in ws.parent.named_styles:
-        ws.parent.add_named_style(money_style)
-
-    for row in ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=5):
-        for cell in row:
-            cell.border = border
-            cell.alignment = Alignment(horizontal="center", vertical="center")
-            if cell.row == 1:
-                cell.font = bold_font
-                cell.fill = fill_header
-            elif cell.column in (4, 5):
-                cell.style = money_style
-
-def add_chart(ws, start_row: int):
-    chart = BarChart()
-    chart.title = "Totais por Categoria"
-    chart.x_axis.title = "Categoria"
-    chart.y_axis.title = "Total (R$)"
-
-    data = Reference(ws, min_col=2, min_row=start_row + 1, max_row=ws.max_row)
-    categories = Reference(ws, min_col=1, min_row=start_row + 2, max_row=ws.max_row)
-
-    chart.add_data(data, titles_from_data=True)
-    chart.set_categories(categories)
-
-    ws.add_chart(chart, f"A{ws.max_row + 3}")
-
-def write_items_to_sheet(ws, items, totals_by_category):
-    for item in items:
-        ws.append([
-            item["Description"],
-            item["Quantity"],
-            item["Unit"],
-            item["Unit Price"],
-            item["Total Price"]
-        ])
-    ws.append([])
-    totals_start_row = ws.max_row + 1
-    ws.append(["Totais por Categoria"])
-    ws.append(["Categoria", "Total (R$)"])
-    for category, total in totals_by_category.items():
-        ws.append([category, total])
-
-    apply_formatting(ws)
-    add_chart(ws, totals_start_row)
-
-def save_project_spreadsheet(project_name: str, items, totals_by_category) -> float:
-    filename = f"projeto_{project_name}.xlsx"
+def save_project_spreadsheet(project_name, items, totals_by_category):
+    filename = f"project_{project_name}.xlsx"
     if os.path.exists(filename):
         wb = load_workbook(filename)
         ws = wb.active
     else:
         wb = Workbook()
         ws = wb.active
-        ws.title = "Itens do Projeto"
-        ws.append(["Descrição", "Quantidade", "Unidade", "Preço Unitário (R$)", "Preço Total (R$)"])
-
-    write_items_to_sheet(ws, items, totals_by_category)
+        ws.title = "Project Items"
+        ws.append(["Description", "Qty", "Unit", "Unit Price (R$)", "Total Price (R$)"])
+    # write
+    start_row = ws.max_row
+    for item in items:
+        ws.append([item['desc'], item['qty'], item['unit'], item['unit_price'], item['total']])
+    ws.append([])
+    totals_start = ws.max_row
+    ws.append(["Totals by Category"])
+    ws.append(["Category", "Total"])
+    for cat, tot in totals_by_category.items():
+        ws.append([cat, tot])
+    # formatting
+    bold = Font(bold=True)
+    fill = PatternFill("solid", fgColor="BDD7EE")
+    border = Border(*(Side(style='thin'),)*4)
+    money = NamedStyle(name="money", number_format='"R$"#,##0.00')
+    if "money" not in wb.named_styles:
+        wb.add_named_style(money)
+    for r in ws.iter_rows(min_row=1, max_col=5, max_row=ws.max_row):
+        for cell in r:
+            cell.border = border
+            cell.alignment = Alignment(horizontal="center")
+            if cell.row == 1:
+                cell.font=bold; cell.fill=fill
+            if cell.column in (4,5):
+                cell.style="money"
+    # chart
+    chart = BarChart()
+    chart.title = "Totals per Category"
+    chart.x_axis.title = "Category"; chart.y_axis.title="Total"
+    data = Reference(ws, min_col=2, min_row=totals_start+1, max_row=ws.max_row)
+    cats = Reference(ws, min_col=1, min_row=totals_start+2, max_row=ws.max_row)
+    chart.add_data(data, titles_from_data=True)
+    chart.set_categories(cats)
+    ws.add_chart(chart, f"A{ws.max_row+3}")
     wb.save(filename)
-    print(f"\nArquivo '{filename}' salvo com sucesso.")
-    open_file(filename)
+    try:
+        if platform.system()=="Windows": os.startfile(filename)
+        elif platform.system()=="Darwin": os.system(f"open {filename}")
+        else: os.system(f"xdg-open {filename}")
+    except: pass
     return sum(totals_by_category.values())
 
-def save_project_info_sheet(project_name: str, info: dict):
-    filename = f"projeto_{project_name}.xlsx"
-    wb = load_workbook(filename) if os.path.exists(filename) else Workbook()
-
-    if "Informações" in wb.sheetnames:
-        wb.remove(wb["Informações"])
-    ws = wb.create_sheet(title="Informações")
-    ws.append(["Campo", "Valor"])
-    for key in ["Manager", "ManagerEmail", "Opening Date", "Estimated Completion", "Estimated Cost"]:
-        ws.append([key, info[key]])
-
-    ws.append([])
-    ws.append(["Nome Participante", "Email", "Telefone"])
-    for p in info.get("Participants", []):
-        ws.append([p["Name"], p["Email"], p["Phone"]])
-
-    wb.save(filename)
-    print(f"Informações do projeto salvas em '{filename}'.")
-
-def update_project_summary(project_name: str, project_total: float):
-    summary_filename = "resumo_projetos.xlsx"
-    if os.path.exists(summary_filename):
-        wb = load_workbook(summary_filename)
-        ws = wb.active
+def update_summary(project_name, total_cost):
+    fn="project_summary.xlsx"
+    if os.path.exists(fn):
+        wb=load_workbook(fn); ws=wb.active
     else:
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Resumo"
-        ws.append(["Projeto", "Custo Total (R$)"])
-
-    for row in ws.iter_rows(min_row=2, values_only=False):
-        if row[0].value == project_name:
+        wb=Workbook(); ws=wb.active
+        ws.title="Summary"
+        ws.append(["Project","Total Cost"])
+    # remove existing
+    for row in ws.iter_rows(min_row=2):
+        if row[0].value==project_name:
             ws.delete_rows(row[0].row)
-    ws.append([project_name, project_total])
-    wb.save(summary_filename)
-    print(f"Resumo atualizado em '{summary_filename}'.")
+    ws.append([project_name, total_cost])
+    wb.save(fn)
 
-def send_project_email(project_name, info):
-    from_email = info["ManagerEmail"]
-    app_password = os.getenv("EMAIL_PASSWORD")
-
-    for participant in info.get("Participants", []):
-        msg = EmailMessage()
-        msg["Subject"] = f"Abertura do projeto: {project_name}"
-        msg["From"] = from_email
-        msg["To"] = participant["Email"]
-        msg.set_content(
-            f"""
-Olá {participant['Name']},
-
-Você foi registrado como participante do projeto "{project_name}".
-
-Gerente do Projeto: {info['Manager']}
-Data de Abertura: {info['Opening Date']}
-Conclusão Estimada: {info['Estimated Completion']}
-Custo Estimado: R$ {info['Estimated Cost']:.2f}
-
-Obrigado.
-""".strip()
-        )
-
+def send_emails(project_name, info):
+    from_addr = info['manager_email']
+    pwd = os.getenv("EMAIL_PASSWORD")
+    for p in info['participants']:
+        msg=EmailMessage()
+        msg["Subject"] = f"New Project: {project_name}"
+        msg["From"] = from_addr
+        msg["To"] = p['email']
+        msg.set_content(f"Hello {p['name']},\n\nYou were added to project \"{project_name}\".\nManager: {info['manager']}\nStart: {info['start_date']}\nEnd: {info['end_date']}\nEstimated Cost: R$ {info['est_cost']:.2f}")
         try:
-            with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
-                smtp.login(from_email, app_password)
+            with smtplib.SMTP_SSL("smtp.gmail.com",465) as smtp:
+                smtp.login(from_addr,pwd)
                 smtp.send_message(msg)
-            print(f"E-mail enviado para {participant['Email']}")
-        except Exception as e:
-            print(f"Erro ao enviar e-mail para {participant['Email']}: {e}")
+        except:
+            messagebox.showwarning("Email Error", f"Could not send to {p['email']}")
 
-def main():
-    print("=== Sistema de Registro de Projetos ===")
+class ProjectManagerApp(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("Project Manager")
+        self.geometry("400x300")
+        self.projects = []
+        self.create_widgets()
+        self.refresh_projects()
 
-    while True:
-        projects = list_existing_projects()
-        if projects:
-            print("\nProjetos cadastrados:")
-            for i, name in enumerate(projects, 1):
-                print(f"{i}. {name}")
+    def create_widgets(self):
+        self.lst = tk.Listbox(self)
+        self.lst.pack(fill="both", expand=True, padx=10, pady=5)
+
+        fr = tk.Frame(self)
+        fr.pack(pady=5)
+        for txt,cmd in [("New Project",self.new_project),("Edit Project",self.edit_project),("Delete Project",self.delete_project),("Exit",self.quit)]:
+            tk.Button(fr,text=txt,command=cmd).pack(side="left", padx=5)
+
+    def refresh_projects(self):
+        self.projects = list_existing_projects()
+        self.lst.delete(0,"end")
+        if self.projects:
+            for p in self.projects:
+                self.lst.insert("end", p)
         else:
-            print("\n⚠️  Não há projetos cadastrados.")
+            self.lst.insert("end","<No projects>")
 
-        print("\nEscolha uma opção:")
-        print("1. Incluir novo projeto")
-        print("2. Acrescentar informações a projeto existente")
-        print("3. Deletar projeto cadastrado")
-        print("4. Sair")
+    def new_project(self):
+        name = simpledialog.askstring("New Project","Project Name:")
+        if not name: return
+        name = name.strip().replace(" ","_")
+        if name in self.projects:
+            messagebox.showerror("Error","Project exists")
+            return
+        manager = simpledialog.askstring("Manager Info","Manager Name:")
+        email = simpledialog.askstring("Manager Email","Manager Email:")
+        sd = simpledialog.askstring("Dates","Start Date (YYYY-MM-DD):")
+        ed = simpledialog.askstring("Dates","Estimated End Date:")
+        cost = simpledialog.askfloat("Cost","Estimated Cost (R$):")
+        participants = []
+        while True:
+            pn = simpledialog.askstring("Participant","Name (blank to finish):")
+            if not pn: break
+            pe = simpledialog.askstring("Participant","Email:")
+            participants.append({"name":pn,"email":pe})
+        info = {"manager":manager,"manager_email":email,"start_date":sd,"end_date":ed,"est_cost":cost,"participants":participants}
+        # Items
+        items=[]; totals=defaultdict(float)
+        while True:
+            desc = simpledialog.askstring("Item","Description (blank to finish):")
+            if not desc: break
+            qty = simpledialog.askfloat("Item","Quantity:")
+            unit = simpledialog.askstring("Item","Unit:")
+            up = simpledialog.askfloat("Item","Unit Price (R$):")
+            total = qty * up
+            items.append({"desc":desc,"qty":qty,"unit":unit,"unit_price":up,"total":total})
+            totals[desc]+=total
+        tc = save_project_spreadsheet(name, items, totals)
+        update_summary(name, tc)
+        send_emails(name, info)
+        self.refresh_projects()
 
-        option = input("Digite o número da opção desejada: ").strip()
+    def edit_project(self):
+        sel=self.lst.curselection()
+        if not sel or not self.projects: return
+        name=self.projects[sel[0]]
+        items=[]; totals=defaultdict(float)
+        while True:
+            desc = simpledialog.askstring("Add Item","Description (blank to finish):")
+            if not desc: break
+            qty = simpledialog.askfloat("Qty","Quantity:")
+            unit = simpledialog.askstring("Unit","Unit:")
+            up = simpledialog.askfloat("Unit Price","Unit Price (R$):")
+            total = qty * up
+            items.append({"desc":desc,"qty":qty,"unit":unit,"unit_price":up,"total":total})
+            totals[desc]+=total
+        if items:
+            tc = save_project_spreadsheet(name, items, totals)
+            update_summary(name, tc)
+            messagebox.showinfo("Updated", f"Added items to {name}")
 
-        if option == '1':
-            project_name = get_validated_input("Nome do projeto: ", str, capitalize=True).replace(" ", "_")
-            if project_name in projects:
-                print("⚠️  Já existe um projeto com esse nome. Escolha outro nome.")
-                continue
-
-            manager = get_validated_input("Nome do gerente: ", str, capitalize=True)
-            manager_email = get_validated_input("Email do gerente (remetente): ", str)
-            opening_date = get_validated_input("Data de abertura (YYYY-MM-DD): ", str)
-            estimated_completion = get_validated_input("Data estimada de conclusão (YYYY-MM-DD): ", str)
-            estimated_cost = get_validated_input("Custo estimado (R$): ", float)
-
-            participants = []
-            print("\nCadastro de participantes (deixe nome em branco para terminar):")
-            while True:
-                name = input("Nome: ").strip()
-                if not name:
-                    break
-                name = name.title()
-                email = input("Email: ").strip()
-                phone = input("Telefone: ").strip()
-                participants.append({"Name": name, "Email": email, "Phone": phone})
-
-            project_info = {
-                "Manager": manager,
-                "ManagerEmail": manager_email,
-                "Opening Date": opening_date,
-                "Estimated Completion": estimated_completion,
-                "Estimated Cost": estimated_cost,
-                "Participants": participants
-            }
-
-            save_project_info_sheet(project_name, project_info)
-            send_project_email(project_name, project_info)
-
-        elif option == '2':
-            if not projects:
-                print("⚠️  Nenhum projeto disponível para editar.")
-                continue
-            print("\nProjetos existentes:")
-            for i, name in enumerate(projects, 1):
-                print(f"{i}. {name}")
-            selection = get_validated_input("Escolha o número do projeto: ", int)
-            if 1 <= selection <= len(projects):
-                project_name = projects[selection - 1]
-            else:
-                print("Opção inválida.")
-                continue
-
-            while True:
-                print("\nDeseja adicionar novos itens ao projeto?")
-                cont = input("Digite 's' para sim ou qualquer outra tecla para voltar ao menu: ").strip().lower()
-                if cont != 's':
-                    break
-                items, totals = register_items()
-                if items:
-                    total_cost = save_project_spreadsheet(project_name, items, totals)
-                    update_project_summary(project_name, total_cost)
-                else:
-                    print("Nenhum item registrado.")
-
-        elif option == '3':
-            if not projects:
-                print("⚠️  Nenhum projeto disponível para deletar.")
-                continue
-            print("\nProjetos existentes:")
-            for i, name in enumerate(projects, 1):
-                print(f"{i}. {name}")
-            selection = get_validated_input("Escolha o número do projeto a deletar: ", int)
-            if 1 <= selection <= len(projects):
-                project_name = projects[selection - 1]
-                filename = f"projeto_{project_name}.xlsx"
-                os.remove(filename)
-                print(f"Projeto '{project_name}' deletado com sucesso.")
-            else:
-                print("Opção inválida.")
-
-        elif option == '4':
-            print("Saindo do sistema. Até logo!")
-            break
-        else:
-            print("Opção inválida. Escolha um número entre 1 e 4.")
+    def delete_project(self):
+        sel=self.lst.curselection()
+        if not sel or not self.projects: return
+        name=self.projects[sel[0]]
+        if messagebox.askyesno("Delete","Delete project "+name+"?"):
+            fn=f"project_{name}.xlsx"
+            os.remove(fn)
+            update_summary(name,0)
+            self.refresh_projects()
 
 if __name__ == "__main__":
-    main()
+    app = ProjectManagerApp()
+    app.mainloop()

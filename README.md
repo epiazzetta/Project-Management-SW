@@ -21,3 +21,10 @@ EMAIL_PASSWORD=your_app_password
 
 Install:
 pip install python-dotenv openpyxl
+
+
+App GUI created with Tkinter, including Listbox and buttons for:
+  New Project — creates a new project and collects information
+  Edit Project — adds items to an existing project
+  Delete Project — removes the project's .xlsx file
+  Exit — closes the application

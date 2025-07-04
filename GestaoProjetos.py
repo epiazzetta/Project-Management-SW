@@ -2,8 +2,8 @@
 
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management - Versão 1.5
-# Autor: Ermelino Piazzetta (modificado por segurança)
+# Project Management - Versão 1.7
+# Autor: Ermelino Piazzetta 
 # -------------------------------------------
 
 import os
@@ -17,9 +17,7 @@ import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
 
-# Carrega variáveis de ambiente
 load_dotenv()
-
 
 def get_validated_input(prompt: str, convert_func=str, capitalize=False):
     while True:
@@ -38,9 +36,8 @@ def get_validated_input(prompt: str, convert_func=str, capitalize=False):
         if confirm == 's':
             return value
 
-
 def register_items():
-    print("\n=== Item Registration ===")
+    print("\n=== Registro de Itens ===")
     print("Digite 'end' para encerrar.\n")
     items = []
     totals_by_category = defaultdict(float)
@@ -67,7 +64,6 @@ def register_items():
 
     return items, totals_by_category
 
-
 def open_file(filename: str):
     if platform.system() == "Windows":
         os.startfile(filename)
@@ -76,18 +72,14 @@ def open_file(filename: str):
     else:
         os.system(f"xdg-open {filename}")
 
-
 def list_existing_projects():
     return [f[8:-5] for f in os.listdir() if f.startswith("projeto_") and f.endswith(".xlsx")]
-
 
 def apply_formatting(ws):
     bold_font = Font(bold=True)
     fill_header = PatternFill("solid", fgColor="BDD7EE")
-    border = Border(
-        left=Side(style='thin'), right=Side(style='thin'),
-        top=Side(style='thin'), bottom=Side(style='thin')
-    )
+    border = Border(left=Side(style='thin'), right=Side(style='thin'),
+                    top=Side(style='thin'), bottom=Side(style='thin'))
     money_style = NamedStyle(name="money_style", number_format='"R$"#,##0.00')
     if "money_style" not in ws.parent.named_styles:
         ws.parent.add_named_style(money_style)
@@ -102,7 +94,6 @@ def apply_formatting(ws):
             elif cell.column in (4, 5):
                 cell.style = money_style
 
-
 def add_chart(ws, start_row: int):
     chart = BarChart()
     chart.title = "Totais por Categoria"
@@ -116,7 +107,6 @@ def add_chart(ws, start_row: int):
     chart.set_categories(categories)
 
     ws.add_chart(chart, f"A{ws.max_row + 3}")
-
 
 def write_items_to_sheet(ws, items, totals_by_category):
     for item in items:
@@ -137,7 +127,6 @@ def write_items_to_sheet(ws, items, totals_by_category):
     apply_formatting(ws)
     add_chart(ws, totals_start_row)
 
-
 def save_project_spreadsheet(project_name: str, items, totals_by_category) -> float:
     filename = f"projeto_{project_name}.xlsx"
     if os.path.exists(filename):
@@ -153,9 +142,7 @@ def save_project_spreadsheet(project_name: str, items, totals_by_category) -> fl
     wb.save(filename)
     print(f"\nArquivo '{filename}' salvo com sucesso.")
     open_file(filename)
-
     return sum(totals_by_category.values())
-
 
 def save_project_info_sheet(project_name: str, info: dict):
     filename = f"projeto_{project_name}.xlsx"
@@ -176,7 +163,6 @@ def save_project_info_sheet(project_name: str, info: dict):
     wb.save(filename)
     print(f"Informações do projeto salvas em '{filename}'.")
 
-
 def update_project_summary(project_name: str, project_total: float):
     summary_filename = "resumo_projetos.xlsx"
     if os.path.exists(summary_filename):
@@ -194,7 +180,6 @@ def update_project_summary(project_name: str, project_total: float):
     ws.append([project_name, project_total])
     wb.save(summary_filename)
     print(f"Resumo atualizado em '{summary_filename}'.")
-
 
 def send_project_email(project_name, info):
     from_email = info["ManagerEmail"]
@@ -228,14 +213,32 @@ Obrigado.
         except Exception as e:
             print(f"Erro ao enviar e-mail para {participant['Email']}: {e}")
 
-
 def main():
     print("=== Sistema de Registro de Projetos ===")
 
     while True:
-        choice = input("\nNovo projeto (n) ou existente (e)? ").strip().lower()
-        if choice == 'n':
+        projects = list_existing_projects()
+        if projects:
+            print("\nProjetos cadastrados:")
+            for i, name in enumerate(projects, 1):
+                print(f"{i}. {name}")
+        else:
+            print("\n⚠️  Não há projetos cadastrados.")
+
+        print("\nEscolha uma opção:")
+        print("1. Incluir novo projeto")
+        print("2. Acrescentar informações a projeto existente")
+        print("3. Deletar projeto cadastrado")
+        print("4. Sair")
+
+        option = input("Digite o número da opção desejada: ").strip()
+
+        if option == '1':
             project_name = get_validated_input("Nome do projeto: ", str, capitalize=True).replace(" ", "_")
+            if project_name in projects:
+                print("⚠️  Já existe um projeto com esse nome. Escolha outro nome.")
+                continue
+
             manager = get_validated_input("Nome do gerente: ", str, capitalize=True)
             manager_email = get_validated_input("Email do gerente (remetente): ", str)
             opening_date = get_validated_input("Data de abertura (YYYY-MM-DD): ", str)
@@ -264,39 +267,54 @@ def main():
 
             save_project_info_sheet(project_name, project_info)
             send_project_email(project_name, project_info)
-            break
 
-        elif choice == 'e':
-            projects = list_existing_projects()
+        elif option == '2':
             if not projects:
-                print("Nenhum projeto encontrado.")
-                return
+                print("⚠️  Nenhum projeto disponível para editar.")
+                continue
+            print("\nProjetos existentes:")
             for i, name in enumerate(projects, 1):
                 print(f"{i}. {name}")
             selection = get_validated_input("Escolha o número do projeto: ", int)
             if 1 <= selection <= len(projects):
                 project_name = projects[selection - 1]
-                break
             else:
                 print("Opção inválida.")
-        else:
-            print("Opção inválida. Use 'n' ou 'e'.")
+                continue
 
-    while True:
-        print("\nDeseja adicionar novos itens ao projeto?")
-        cont = input("Digite 's' para sim ou qualquer outra tecla para encerrar: ").strip().lower()
-        if cont != 's':
-            print("Encerrando o projeto.")
+            while True:
+                print("\nDeseja adicionar novos itens ao projeto?")
+                cont = input("Digite 's' para sim ou qualquer outra tecla para voltar ao menu: ").strip().lower()
+                if cont != 's':
+                    break
+                items, totals = register_items()
+                if items:
+                    total_cost = save_project_spreadsheet(project_name, items, totals)
+                    update_project_summary(project_name, total_cost)
+                else:
+                    print("Nenhum item registrado.")
+
+        elif option == '3':
+            if not projects:
+                print("⚠️  Nenhum projeto disponível para deletar.")
+                continue
+            print("\nProjetos existentes:")
+            for i, name in enumerate(projects, 1):
+                print(f"{i}. {name}")
+            selection = get_validated_input("Escolha o número do projeto a deletar: ", int)
+            if 1 <= selection <= len(projects):
+                project_name = projects[selection - 1]
+                filename = f"projeto_{project_name}.xlsx"
+                os.remove(filename)
+                print(f"Projeto '{project_name}' deletado com sucesso.")
+            else:
+                print("Opção inválida.")
+
+        elif option == '4':
+            print("Saindo do sistema. Até logo!")
             break
-
-        items, totals = register_items()
-        if items:
-            total_cost = save_project_spreadsheet(project_name, items, totals)
-            update_project_summary(project_name, total_cost)
         else:
-            print("Nenhum item registrado.")
-
-
+            print("Opção inválida. Escolha um número entre 1 e 4.")
 
 if __name__ == "__main__":
     main()

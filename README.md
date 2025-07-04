@@ -33,3 +33,15 @@ Menus at the top
 Tabs using ttk.Notebook
 Detailed view of items and participants in tables
 More organized forms for data entry
+
+How it works:
+Main screen: project list on the left, details on the right in tabs.
+Project Info tab: shows basic data.
+Participants tab: lists participants.
+Project Items tab: lists and edits project items.
+Menu allows creating a new project or deleting one.
+Dialogs to add participants and items with validation.
+Automatic email sending to participants.
+Prevents duplicate participants and items.
+Excel spreadsheets updated and opened automatically.
+View of totals and charts in the spreadsheet.

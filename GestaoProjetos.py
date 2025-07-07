@@ -1,7 +1,7 @@
 
 # -*- coding: utf-8 -*-
 # -------------------------------------------
-# Project Management GUI - Version 2.0
+# Project Management GUI - Version 2.1
 # Author: Ermelino Piazzetta (modified)
 # Using Tkinter with tabs and detailed views
 # -------------------------------------------
